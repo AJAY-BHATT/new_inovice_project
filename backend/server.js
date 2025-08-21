@@ -11,7 +11,14 @@ import invoiceRoutes from "./routes/invoice.js";
 dotenv.config();
 const app = express();
 
-app.use(cors());
+// ✅ Restrict CORS to only your frontend
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL, // e.g. https://invoice-frontend.onrender.com
+    credentials: true,
+  })
+);
+
 app.use(bodyParser.json());
 
 // Routes
@@ -20,8 +27,10 @@ app.use("/products", productRoutes);
 app.use("/invoice", invoiceRoutes);
 
 const PORT = process.env.PORT || 8080;
-mongoose.connect(process.env.MONGO_URI)
+
+mongoose
+  .connect(process.env.MONGO_URI)
   .then(() => {
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
   })
-  .catch((err) => console.log(err));
+  .catch((err) => console.log("❌ MongoDB Connection Error:", err));
