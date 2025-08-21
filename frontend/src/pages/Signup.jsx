@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { api } from "../api";
 
 function Signup() {
-  const [name, setName] = useState("");
+  const [username, setUsername] = useState(""); // changed from name
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
@@ -11,10 +11,12 @@ function Signup() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await api.post("/auth/signup", { name, email, password });
-      navigate("/");
+      // send username instead of name
+      await api.post("/auth/signup", { username, email, password });
+      navigate("/"); // redirect to login page after signup
     } catch (err) {
-      alert("Signup failed");
+      console.error(err); // log full error for debugging
+      alert("Signup failed. Check your input!");
     }
   };
 
@@ -53,17 +55,17 @@ function Signup() {
 
           <h2 className="text-3xl font-bold mb-2">Let the Journey Begin!</h2>
           <p className="text-gray-400 text-sm mb-6">
-            This is a basic signup page which is used for levitation assignment purpose.
+            This is a basic signup page for Levitation assignment purpose.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm mb-1">Full Name</label>
+              <label className="block text-sm mb-1">Username</label>
               <input
                 type="text"
-                placeholder="Enter Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                placeholder="Enter Username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-4 py-3 rounded-lg bg-[#1e1e1e] border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-400"
               />
             </div>
