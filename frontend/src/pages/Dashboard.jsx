@@ -49,23 +49,44 @@ function Dashboard() {
     navigate("/");
   };
 
-  const handleInvoice = () => {
-    window.open("http://localhost:8080/invoice/download", "_blank");
+  // Download PDF Invoice
+  const handleInvoice = async () => {
+    try {
+      const res = await fetch("http://localhost:8080/invoice/download", {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) throw new Error("Failed to download invoice");
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "invoice.pdf";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to download invoice");
+    }
   };
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
       {/* Navbar */}
       <div className="flex justify-between items-center px-6 py-4 bg-gray-900">
-        {/* Logo */}
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center font-bold text-black">
             L
           </div>
-          <h1 className="font-semibold text-lg">levitation <span className="text-gray-400 text-sm">infotech</span></h1>
+          <h1 className="font-semibold text-lg">
+            levitation <span className="text-gray-400 text-sm">infotech</span>
+          </h1>
         </div>
 
-        {/* Logout */}
         <button
           onClick={handleLogout}
           className="bg-green-400 hover:bg-green-500 text-black px-4 py-1 rounded"
@@ -130,7 +151,6 @@ function Dashboard() {
                 </tr>
               ))}
 
-              {/* Example footer rows */}
               <tr className="bg-gray-900">
                 <td colSpan={3} className="px-4 py-2 border border-gray-700 text-right font-semibold">
                   Sub-Total
