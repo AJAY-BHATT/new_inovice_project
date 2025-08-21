@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 
@@ -7,8 +7,10 @@ function Dashboard() {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [qty, setQty] = useState("");
-  const navigate = useNavigate();
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
+  const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
   const fetchProducts = async () => {
@@ -29,10 +31,17 @@ function Dashboard() {
 
   const handleAdd = async (e) => {
     e.preventDefault();
+    setError("");
+    if (!name.trim()) return setError("Product name required");
+    const p = parseFloat(price);
+    const q = parseInt(qty, 10);
+    if (!Number.isFinite(p) || p < 0) return setError("Price must be 0 or more");
+    if (!Number.isFinite(q) || q <= 0) return setError("Quantity must be positive");
+
     try {
       await api.post(
         "/products",
-        { name, price, qty },
+        { name, price: p, qty: q },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setName("");
@@ -40,7 +49,7 @@ function Dashboard() {
       setQty("");
       fetchProducts();
     } catch (err) {
-      alert("Failed to add product");
+      setError("Failed to add product");
     }
   };
 
@@ -49,12 +58,27 @@ function Dashboard() {
     navigate("/");
   };
 
+  // Calculate subtotal, GST and total
+  const subtotal = useMemo(
+    () => products.reduce((sum, p) => sum + p.price * p.qty, 0),
+    [products]
+  );
+  const gst = +(subtotal * 0.18).toFixed(2);
+  const total = +(subtotal + gst).toFixed(2);
+
   // Download PDF Invoice
   const handleInvoice = async () => {
+    if (products.length === 0) return setError("Add at least one product");
+    setLoading(true);
+    setError("");
     try {
       const res = await fetch("http://localhost:8080/invoice/download", {
-        method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
+        method: "POST", // Usually POST with products and GST data
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ products, gstPercent: 18 }),
       });
 
       if (!res.ok) throw new Error("Failed to download invoice");
@@ -63,14 +87,18 @@ function Dashboard() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "invoice.pdf";
+      a.download = `invoice.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      window.URL.revokeObjectURL(url);
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+
+      setProducts([]); // Clear products if needed
     } catch (err) {
       console.error(err);
-      alert("Failed to download invoice");
+      setError(err.message || "Failed to download invoice");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -86,7 +114,6 @@ function Dashboard() {
             levitation <span className="text-gray-400 text-sm">infotech</span>
           </h1>
         </div>
-
         <button
           onClick={handleLogout}
           className="bg-green-400 hover:bg-green-500 text-black px-4 py-1 rounded"
@@ -110,12 +137,17 @@ function Dashboard() {
           />
           <input
             value={price}
+            type="number"
+            min="0"
+            step="0.01"
             onChange={(e) => setPrice(e.target.value)}
             placeholder="Price"
             className="p-2 rounded bg-gray-800 text-white placeholder-gray-400 focus:outline-none"
           />
           <input
             value={qty}
+            type="number"
+            min="1"
             onChange={(e) => setQty(e.target.value)}
             placeholder="Quantity"
             className="p-2 rounded bg-gray-800 text-white placeholder-gray-400 focus:outline-none"
@@ -127,6 +159,8 @@ function Dashboard() {
             Add Product +
           </button>
         </form>
+
+        {error && <div className="text-red-400 mb-4">{error}</div>}
 
         {/* Table */}
         <div className="w-full max-w-4xl overflow-x-auto">
@@ -142,26 +176,25 @@ function Dashboard() {
             <tbody>
               {products.map((p) => (
                 <tr key={p._id} className="bg-black hover:bg-gray-800">
-                  <td className="px-4 py-2 border border-gray-700 italic">( {p.name} )</td>
+                  <td className="px-4 py-2 border border-gray-700 italic">{p.name}</td>
                   <td className="px-4 py-2 border border-gray-700">{p.price}</td>
                   <td className="px-4 py-2 border border-gray-700">{p.qty}</td>
                   <td className="px-4 py-2 border border-gray-700">
-                    INR {p.price * p.qty}
+                    INR {(p.price * p.qty).toFixed(2)}
                   </td>
                 </tr>
               ))}
-
               <tr className="bg-gray-900">
                 <td colSpan={3} className="px-4 py-2 border border-gray-700 text-right font-semibold">
                   Sub-Total
                 </td>
-                <td className="px-4 py-2 border border-gray-700">INR 82.6</td>
+                <td className="px-4 py-2 border border-gray-700">INR {subtotal.toFixed(2)}</td>
               </tr>
               <tr className="bg-gray-900">
                 <td colSpan={3} className="px-4 py-2 border border-gray-700 text-right font-semibold">
                   Incl + GST 18%
                 </td>
-                <td className="px-4 py-2 border border-gray-700">INR 82.6</td>
+                <td className="px-4 py-2 border border-gray-700">INR {total.toFixed(2)}</td>
               </tr>
             </tbody>
           </table>
@@ -170,9 +203,10 @@ function Dashboard() {
         {/* Invoice Button */}
         <button
           onClick={handleInvoice}
+          disabled={loading}
           className="mt-8 bg-gray-800 hover:bg-gray-700 text-green-400 font-semibold px-6 py-3 rounded"
         >
-          Generate PDF Invoice
+          {loading ? "Generating..." : "Generate PDF Invoice"}
         </button>
       </div>
     </div>
